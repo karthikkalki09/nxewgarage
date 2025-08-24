@@ -8,6 +8,9 @@ import ProductList from './components/ProductList';
 import ProductForm from './components/ProductForm';
 import ProductDetail from './components/ProductDetail';
 import ContactSeller from './components/contactseller';
+import UserProfile from './components/userprofile';
+import Login from './components/login';
+import Signup from './components/signup';
 
 // Sample data
 const initialProducts = [
@@ -17,13 +20,16 @@ const initialProducts = [
     price: 850,
     category: "Electronics",
     description: "Like new iPhone 13 Pro with 256GB storage. Includes original box and accessories.",
-    images: ["https://i.pinimg.com/736x/f0/82/4c/f0824cf33dc11aee51bd5ff104266d70.jpg"],
+    images: ["https://via.placeholder.com/400x300?text=iPhone+13+Pro"],
     seller: {
       name: "John Smith",
       phone: "555-1234",
-      email: "john.smith@example.com"
+      email: "john.smith@example.com",
+      id: "user1"
     },
-    date: "2023-05-15"
+    date: "2023-05-15",
+    condition: "Excellent",
+    location: "New York"
   },
   {
     id: 2,
@@ -31,41 +37,36 @@ const initialProducts = [
     price: 18500,
     category: "Vehicles",
     description: "Low mileage Honda Civic in excellent condition. Regularly serviced with full service history.",
-    images: ["https://i.pinimg.com/1200x/92/ab/ec/92abec10f7b4991688fb2c5695d46d89.jpg"],
+    images: ["https://via.placeholder.com/400x300?text=Honda+Civic"],
     seller: {
       name: "Sarah Johnson",
       phone: "555-5678",
-      email: "sarahj@example.com"
+      email: "sarahj@example.com",
+      id: "user2"
     },
-    date: "2023-05-10"
+    date: "2023-05-10",
+    condition: "Very Good",
+    location: "Los Angeles"
+  }
+];
+
+// Sample users (in a real app, this would be in a database)
+const sampleUsers = [
+  {
+    id: "user1",
+    name: "John Smith",
+    email: "john@example.com",
+    password: "password123",
+    phone: "555-1234",
+    location: "New York"
   },
   {
-    id: 3,
-    title: "Samsung 4K Smart TV",
-    price: 600,
-    category: "Electronics",
-    description: "55 inch Samsung 4K Smart TV. Perfect condition with remote and stand included.",
-    images: ["https://i.pinimg.com/1200x/e5/72/42/e57242476c69b83ad60a1b52e19fc03a.jpg"],
-    seller: {
-      name: "Mike Thompson",
-      phone: "555-9012",
-      email: "mike.t@example.com"
-    },
-    date: "2023-05-08"
-  },
-  {
-    id: 4,
-    title: "Canon EOS R5 Camera",
-    price: 3200,
-    category: "Electronics",
-    description: "Professional mirrorless camera with 45MP. Includes two lenses and camera bag.",
-    images: ["https://i.pinimg.com/1200x/6c/cf/7e/6ccf7e7308a0900f02bb33fac6798b29.jpg"],
-    seller: {
-      name: "Alex Rivera",
-      phone: "555-3456",
-      email: "alex.rivera@example.com"
-    },
-    date: "2023-05-05"
+    id: "user2",
+    name: "Sarah Johnson",
+    email: "sarah@example.com",
+    password: "password123",
+    phone: "555-5678",
+    location: "Los Angeles"
   }
 ];
 
@@ -74,14 +75,25 @@ function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductForm, setShowProductForm] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authAction, setAuthAction] = useState(null); // 'sell' or 'contact'
 
-  // Load products from localStorage on initial render
+  // Load products and user from localStorage on initial render
   useEffect(() => {
     const savedProducts = localStorage.getItem('marketplaceProducts');
     if (savedProducts) {
       setProducts(JSON.parse(savedProducts));
+    }
+
+    const savedUser = localStorage.getItem('marketplaceUser');
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
     }
   }, []);
 
@@ -90,14 +102,39 @@ function App() {
     localStorage.setItem('marketplaceProducts', JSON.stringify(products));
   }, [products]);
 
+  // Save user to localStorage when it changes
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('marketplaceUser', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('marketplaceUser');
+    }
+  }, [currentUser]);
+
   const handleAddProduct = (newProduct) => {
     const product = {
       ...newProduct,
       id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      seller: {
+        ...currentUser
+      }
     };
     setProducts([...products, product]);
     setShowProductForm(false);
+  };
+
+  const handleEditProduct = (updatedProduct) => {
+    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    setShowProductForm(false);
+    setEditingProduct(null);
+  };
+
+  const handleDeleteProduct = (productId) => {
+    if (window.confirm("Are you sure you want to delete this product?")) {
+      setProducts(products.filter(p => p.id !== productId));
+      setSelectedProduct(null);
+    }
   };
 
   const handleProductClick = (product) => {
@@ -106,12 +143,79 @@ function App() {
   };
 
   const handleContactSeller = () => {
+    if (!currentUser) {
+      setAuthAction('contact');
+      setShowLogin(true);
+      return;
+    }
     setShowContactForm(true);
+  };
+
+  const handleSellItemClick = () => {
+    if (!currentUser) {
+      setAuthAction('sell');
+      setShowLogin(true);
+      return;
+    }
+    setEditingProduct(null);
+    setShowProductForm(true);
   };
 
   const handleBackToList = () => {
     setSelectedProduct(null);
     setShowContactForm(false);
+    setEditingProduct(null);
+  };
+
+  const handleEditClick = (product) => {
+    setEditingProduct(product);
+    setShowProductForm(true);
+  };
+
+  const handleLogin = (email, password) => {
+    // In a real app, this would be an API call
+    const user = sampleUsers.find(u => u.email === email && u.password === password);
+    if (user) {
+      setCurrentUser(user);
+      setShowLogin(false);
+      
+      // After login, perform the action that required auth
+      if (authAction === 'sell') {
+        setShowProductForm(true);
+      } else if (authAction === 'contact' && selectedProduct) {
+        setShowContactForm(true);
+      }
+      
+      setAuthAction(null);
+      return true;
+    }
+    return false;
+  };
+
+  const handleSignup = (userData) => {
+    // In a real app, this would be an API call
+    const newUser = {
+      ...userData,
+      id: `user${Date.now()}`
+    };
+    
+    setCurrentUser(newUser);
+    setShowSignup(false);
+    
+    // After signup, perform the action that required auth
+    if (authAction === 'sell') {
+      setShowProductForm(true);
+    } else if (authAction === 'contact' && selectedProduct) {
+      setShowContactForm(true);
+    }
+    
+    setAuthAction(null);
+    return true;
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setShowUserProfile(false);
   };
 
   const filteredProducts = products.filter(product => {
@@ -121,31 +225,82 @@ function App() {
     return matchesCategory && matchesSearch;
   });
 
+  const userProducts = products.filter(product => currentUser && product.seller.id === currentUser.id);
+
   return (
     <div className="App">
       <Header 
-        onAddProduct={() => setShowProductForm(true)} 
+        onAddProduct={handleSellItemClick}
         onSearch={setSearchQuery}
         onFilter={setFilterCategory}
+        onShowProfile={() => setShowUserProfile(true)}
+        user={currentUser}
+        onLogin={() => setShowLogin(true)}
+        onLogout={handleLogout}
       />
       
       <div className="container">
-        {showProductForm ? (
+        {showLogin ? (
+          <Login 
+            onLogin={handleLogin}
+            onSwitchToSignup={() => {
+              setShowLogin(false);
+              setShowSignup(true);
+            }}
+            onClose={() => {
+              setShowLogin(false);
+              setAuthAction(null);
+            }}
+          />
+        ) : showSignup ? (
+          <Signup 
+            onSignup={handleSignup}
+            onSwitchToLogin={() => {
+              setShowSignup(false);
+              setShowLogin(true);
+            }}
+            onClose={() => {
+              setShowSignup(false);
+              setAuthAction(null);
+            }}
+          />
+        ) : showUserProfile ? (
+          <UserProfile 
+            user={currentUser}
+            products={userProducts}
+            onEditProduct={handleEditClick}
+            onDeleteProduct={handleDeleteProduct}
+            onClose={() => setShowUserProfile(false)}
+            onLogin={() => setShowLogin(true)}
+          />
+        ) : showProductForm ? (
           <ProductForm 
-            onSubmit={handleAddProduct}
-            onCancel={() => setShowProductForm(false)}
+            product={editingProduct}
+            onSubmit={editingProduct ? handleEditProduct : handleAddProduct}
+            onCancel={() => {
+              setShowProductForm(false);
+              setEditingProduct(null);
+            }}
           />
         ) : selectedProduct ? (
           showContactForm ? (
             <ContactSeller 
               product={selectedProduct}
               onBack={handleBackToList}
+              currentUser={currentUser}
             />
           ) : (
             <ProductDetail 
               product={selectedProduct}
               onContactSeller={handleContactSeller}
               onBack={handleBackToList}
+              currentUser={currentUser}
+              onEditProduct={handleEditClick}
+              onDeleteProduct={handleDeleteProduct}
+              onLogin={() => {
+                setAuthAction('contact');
+                setShowLogin(true);
+              }}
             />
           )
         ) : (
